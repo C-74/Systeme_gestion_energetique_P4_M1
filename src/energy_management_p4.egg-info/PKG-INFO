@@ -1,3 +1,12 @@
+Metadata-Version: 2.4
+Name: energy-management-p4
+Version: 0.1.0
+Summary: Système de gestion énergétique intelligent avec simulation, KPI et optimisation
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+
 # Projet 4 – Système de gestion énergétique intelligent
 
 Plateforme Python de simulation d'un bâtiment intelligent avec :
