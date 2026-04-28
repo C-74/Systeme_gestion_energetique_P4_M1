@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 from dataclasses import asdict
 from datetime import date
 
 from .dispatch import run_dispatch
+from .data_sources import load_inputs_from_csv
 from .indicators import compute_kpis
 from .models import BatteryConfig
 from .optimization import optimize_flexible_schedule
@@ -27,6 +29,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--date", type=_parse_date, default=date.today(), help="Date AAAA-MM-JJ")
     parser.add_argument("--json", action="store_true", help="Sortie JSON")
     parser.add_argument(
+        "--input-csv",
+        type=Path,
+        help="Chemin CSV d'entrées (colonnes: timestamp, base_load_kwh, flexible_load_kwh, solar_kwh)",
+    )
+    parser.add_argument(
         "--max-relative-shift",
         type=float,
         default=0.45,
@@ -35,9 +42,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_scenarios(simulation_date: date, seed: int, max_relative_shift: float) -> dict:
+def run_scenarios(
+    simulation_date: date,
+    seed: int,
+    max_relative_shift: float,
+    inputs: list | None = None,
+    include_inputs: bool = False,
+) -> dict:
     battery = BatteryConfig()
-    baseline_inputs = generate_synthetic_day(simulation_date=simulation_date, seed=seed)
+    baseline_inputs = inputs or generate_synthetic_day(simulation_date=simulation_date, seed=seed)
     optimized_inputs = optimize_flexible_schedule(baseline_inputs, max_relative_shift=max_relative_shift)
 
     baseline_flows = run_dispatch(baseline_inputs, battery=battery)
@@ -46,10 +59,17 @@ def run_scenarios(simulation_date: date, seed: int, max_relative_shift: float) -
     baseline_kpis = compute_kpis(baseline_flows, battery=battery)
     optimized_kpis = compute_kpis(optimized_flows, battery=battery)
 
-    return {
+    result = {
         "baseline": asdict(baseline_kpis),
         "optimized": asdict(optimized_kpis),
     }
+
+    if include_inputs:
+        result["baseline_inputs"] = baseline_inputs
+        result["optimized_inputs"] = optimized_inputs
+        result["kpis"] = {"baseline": asdict(baseline_kpis), "optimized": asdict(optimized_kpis)}
+
+    return result
 
 
 def print_summary(result: dict) -> None:
@@ -75,7 +95,8 @@ def print_summary(result: dict) -> None:
 
 def main() -> None:
     args = build_parser().parse_args()
-    result = run_scenarios(args.date, args.seed, args.max_relative_shift)
+    custom_inputs = load_inputs_from_csv(args.input_csv) if args.input_csv else None
+    result = run_scenarios(args.date, args.seed, args.max_relative_shift, inputs=custom_inputs)
 
     if args.json:
         print(json.dumps(result, indent=2, ensure_ascii=False))

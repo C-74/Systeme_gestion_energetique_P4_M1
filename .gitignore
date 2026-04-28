@@ -1,3 +1,7 @@
+.venv
+.python-version
+.pytest_cache
+
 # Logs
 logs
 *.log

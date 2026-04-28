@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/energy_management/__init__.py
 src/energy_management/cli.py
+src/energy_management/data_sources.py
 src/energy_management/dispatch.py
 src/energy_management/indicators.py
 src/energy_management/models.py

@@ -51,6 +51,24 @@ Sortie JSON exploitable :
 python -m energy_management.cli --seed 42 --json
 ```
 
+Utiliser vos propres données (CSV avec colonnes `timestamp,base_load_kwh,flexible_load_kwh,solar_kwh`) :
+
+```bash
+python -m energy_management.cli --input-csv data/mesures.csv
+```
+
+Générer rapidement un jeu de données synthétiques :
+
+```bash
+python scripts/simulate_days.py --start-date 2026-04-14 --days 7 --json
+```
+
+Calculer les KPI à partir d'un CSV existant :
+
+```bash
+python scripts/kpi_from_csv.py data/mesures.csv --json
+```
+
 ## KPI calculés
 
 - Consommation totale
