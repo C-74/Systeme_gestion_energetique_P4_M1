@@ -3,5 +3,3 @@ uvicorn
 streamlit
 pandas
 pydantic
-prometheus-client
-psutil
