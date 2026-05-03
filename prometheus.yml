@@ -3,8 +3,8 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'backend_golden_signals'
-    metrics_path: '/metrics'
+  - job_name: 'frontend_golden_signals'
+    metrics_path: '/'
     static_configs:
-      # Ajuste cette adresse selon si tu lances le projet avec Docker ('host.docker.internal:8000') ou en local ('localhost:8000')
-      - targets: ['host.docker.internal:8000']
+      # Cible locale pour tester le Streamlit depuis Grafana/Prometheus (qui tournent en Docker)
+      - targets: ['host.docker.internal:8001']
