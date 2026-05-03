@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import json
+import time
+import psutil
 from dataclasses import asdict
 from datetime import date
 
 import pandas as pd
 import streamlit as st
+from prometheus_client import Counter, Histogram, Gauge, start_http_server
+
+import sys
+import os
+# Ajout du dossier 'src' au chemin de Python pour qu'il trouve le module
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
 from energy_management.cli import run_scenarios
 from energy_management.data_sources import load_inputs_from_csv
@@ -17,6 +25,31 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── Metrics SRE (Prometheus) ──────────────────────────────────────────────────
+# On s'assure que le serveur de métriques ne démarre qu'une seule fois
+@st.cache_resource
+def init_prometheus():
+    start_http_server(8001)
+    return True
+
+init_prometheus()
+
+# Définition des métriques (Golden Signals pour Streamlit)
+if "APP_RUNS" not in st.session_state:
+    st.session_state["APP_RUNS"] = Counter('streamlit_interactions_total', 'Trafic : Nombre total d\'interactions/rechargements')
+    st.session_state["APP_DURATION"] = Histogram('streamlit_run_duration_seconds', 'Latence : Temps d\'exécution du dashboard')
+    st.session_state["SYS_CPU"] = Gauge('process_cpu_usage_percent', 'Saturation : Utilisation CPU')
+    st.session_state["SYS_RAM"] = Gauge('process_memory_usage_percent', 'Saturation : Utilisation RAM')
+    st.session_state["APP_ERRORS"] = Counter('streamlit_errors_total', 'Erreurs : Nombre d\'erreurs rencontrées')
+
+# Incrémentation du trafic (interactions utilisateur)
+st.session_state["APP_RUNS"].inc()
+start_time = time.time()
+
+# Mise à jour de la Saturation
+st.session_state["SYS_CPU"].set(psutil.cpu_percent())
+st.session_state["SYS_RAM"].set(psutil.virtual_memory().percent)
 
 # ── CSS personnalisé ──────────────────────────────────────────────────────────
 st.markdown(
@@ -317,3 +350,8 @@ elif menu == "⚙️ Optimisation":
         file_name=f"kpis_{sim_date.isoformat()}.json",
         mime="application/json",
     )
+
+# ── Fin du script : Enregistrement de la latence ──────────────────────────────
+process_time = time.time() - start_time
+st.session_state["APP_DURATION"].observe(process_time)
+
