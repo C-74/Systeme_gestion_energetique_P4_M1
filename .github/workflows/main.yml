@@ -91,6 +91,8 @@ jobs:
             # Arrete et supprime les anciens conteneurs s'ils existent
             docker rm -f backend-api || true
             docker rm -f frontend-dashboard || true
+            docker rm -f prometheus || true
+            docker rm -f grafana || true
             
             # Récupère la nouvelle image
             docker pull $REPO_URL/$ACTOR/$IMAGE_NAME:latest
@@ -100,6 +102,24 @@ jobs:
             
             # Lancement du Backend (API FastAPI)
             docker run -d --name backend-api --network tp_network -p 3000:3000 $REPO_URL/$ACTOR/$IMAGE_NAME:latest uvicorn api.main:app --host 0.0.0.0 --port 3000
+            
+            # Création du fichier de configuration Prometheus sur le VPS (si non existant)
+            cat << 'EOF' > prometheus.yml
+            global:
+              scrape_interval: 15s
+              evaluation_interval: 15s
+            scrape_configs:
+              - job_name: 'frontend_golden_signals'
+                metrics_path: '/'
+                static_configs:
+                  - targets: ['frontend-dashboard:8001']
+            EOF
+            
+            # Lancement de Prometheus
+            docker run -d --name prometheus --network tp_network -p 9090:9090 -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus:latest
+
+            # Lancement de Grafana (sur le port 8000)
+            docker run -d --name grafana --network tp_network -p 8000:3000 -e GF_SECURITY_ADMIN_PASSWORD=admin grafana/grafana:latest
             
             # Lancement du Frontend (Dashboard Streamlit)
             docker run -d --name frontend-dashboard --network tp_network -p 80:80 $REPO_URL/$ACTOR/$IMAGE_NAME:latest streamlit run dashboard/app.py --server.port 80 --server.address 0.0.0.0

@@ -5,18 +5,18 @@
   "panels": [
     {
       "type": "timeseries",
-      "title": "Trafic (Requêtes / sec)",
+      "title": "Trafic (Interactions / sec)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(http_requests_total[5m]))", "legendFormat": "Trafic global" }
+        { "expr": "sum(rate(streamlit_interactions_total[5m]))", "legendFormat": "Interactions utilisateurs" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Taux d'Erreurs (%)",
+      "title": "Taux d'Erreurs (Crash script)",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(http_requests_total{status_code=~\"4..|5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100", "legendFormat": "% Erreurs" }
+        { "expr": "sum(rate(streamlit_errors_total[5m]))", "legendFormat": "Erreurs script" }
       ]
     },
     {
@@ -24,7 +24,7 @@
       "title": "Latence p95 (secondes)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95 Latence" }
+        { "expr": "histogram_quantile(0.95, sum(rate(streamlit_run_duration_seconds_bucket[5m])) by (le))", "legendFormat": "Temps de chargement p95" }
       ]
     },
     {
