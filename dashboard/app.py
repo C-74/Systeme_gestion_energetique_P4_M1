@@ -31,25 +31,23 @@ st.set_page_config(
 @st.cache_resource
 def init_prometheus():
     start_http_server(8001)
-    return True
+    return {
+        "APP_RUNS": Counter('streamlit_interactions_total', 'Trafic : Nombre total d\'interactions/rechargements'),
+        "APP_DURATION": Histogram('streamlit_run_duration_seconds', 'Latence : Temps d\'exécution du dashboard'),
+        "SYS_CPU": Gauge('process_cpu_usage_percent', 'Saturation : Utilisation CPU'),
+        "SYS_RAM": Gauge('process_memory_usage_percent', 'Saturation : Utilisation RAM'),
+        "APP_ERRORS": Counter('streamlit_errors_total', 'Erreurs : Nombre d\'erreurs rencontrées')
+    }
 
-init_prometheus()
-
-# Définition des métriques (Golden Signals pour Streamlit)
-if "APP_RUNS" not in st.session_state:
-    st.session_state["APP_RUNS"] = Counter('streamlit_interactions_total', 'Trafic : Nombre total d\'interactions/rechargements')
-    st.session_state["APP_DURATION"] = Histogram('streamlit_run_duration_seconds', 'Latence : Temps d\'exécution du dashboard')
-    st.session_state["SYS_CPU"] = Gauge('process_cpu_usage_percent', 'Saturation : Utilisation CPU')
-    st.session_state["SYS_RAM"] = Gauge('process_memory_usage_percent', 'Saturation : Utilisation RAM')
-    st.session_state["APP_ERRORS"] = Counter('streamlit_errors_total', 'Erreurs : Nombre d\'erreurs rencontrées')
+metrics = init_prometheus()
 
 # Incrémentation du trafic (interactions utilisateur)
-st.session_state["APP_RUNS"].inc()
+metrics["APP_RUNS"].inc()
 start_time = time.time()
 
 # Mise à jour de la Saturation
-st.session_state["SYS_CPU"].set(psutil.cpu_percent())
-st.session_state["SYS_RAM"].set(psutil.virtual_memory().percent)
+metrics["SYS_CPU"].set(psutil.cpu_percent())
+metrics["SYS_RAM"].set(psutil.virtual_memory().percent)
 
 # ── CSS personnalisé ──────────────────────────────────────────────────────────
 st.markdown(
@@ -353,5 +351,5 @@ elif menu == "⚙️ Optimisation":
 
 # ── Fin du script : Enregistrement de la latence ──────────────────────────────
 process_time = time.time() - start_time
-st.session_state["APP_DURATION"].observe(process_time)
+metrics["APP_DURATION"].observe(process_time)
 
