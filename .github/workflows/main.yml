@@ -1,1 +1,109 @@
+name: Pipeline CI/CD TP CICD
 
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+  pull_request:
+    branches:
+      - dev
+      - main
+      - master
+
+env:
+  IMAGE_NAME: p4-energy-app
+  REPO_URL: ghcr.io
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repos
+        uses: actions/checkout@v4
+
+      - name: setup python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: install dependencies & test
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+          # Ajout du dossier src au PYTHONPATH pour les tests
+          export PYTHONPATH="$PYTHONPATH:$(pwd)/src"
+          pytest -q
+
+  build:
+    name: build and push
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: checkout repos
+        uses: actions/checkout@v4
+
+      - name: set lower case actor name
+        run: echo "ACTOR=$(echo ${{ github.actor }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: build docker image
+        run: docker build -t $IMAGE_NAME .
+
+      - name: tag image on ghcr
+        run: |
+          docker tag $IMAGE_NAME $REPO_URL/${{ env.ACTOR }}/$IMAGE_NAME:latest
+
+      - name: connexion GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REPO_URL }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.TOKENCICD }}
+
+      - name: push image to ghcr
+        run: |
+          docker push $REPO_URL/${{ env.ACTOR }}/$IMAGE_NAME:latest
+
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: connect to AWS VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          port: ${{ secrets.PORT }}
+          envs: REPO_URL,IMAGE_NAME
+          script: |
+            # Met le pseudo github en minuscule pour Docker
+            ACTOR=$(echo "${{ github.actor }}" | tr '[:upper:]' '[:lower:]')
+            
+            # Connexion au registre GitHub Container Registry
+            echo ${{secrets.TOKENCICD}} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Arrete et supprime les anciens conteneurs s'ils existent
+            docker rm -f backend-api || true
+            docker rm -f frontend-dashboard || true
+            
+            # Récupère la nouvelle image
+            docker pull $REPO_URL/$ACTOR/$IMAGE_NAME:latest
+            
+            # Création d'un réseau docker pour la communication
+            docker network create tp_network || true
+            
+            # Lancement du Backend (API FastAPI)
+            docker run -d --name backend-api --network tp_network -p 3000:3000 $REPO_URL/$ACTOR/$IMAGE_NAME:latest uvicorn api.main:app --host 0.0.0.0 --port 3000
+            
+            # Lancement du Frontend (Dashboard Streamlit)
+            docker run -d --name frontend-dashboard --network tp_network -p 80:80 $REPO_URL/$ACTOR/$IMAGE_NAME:latest streamlit run dashboard/app.py --server.port 80 --server.address 0.0.0.0
+            
+            # Vérification simple du backend
+            sleep 3
+            curl localhost:3000/
