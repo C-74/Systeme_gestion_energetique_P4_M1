@@ -2,53 +2,56 @@ from __future__ import annotations
 
 import math
 import random
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from .models import EnergyInput
 
 
-def generate_synthetic_day(
-    simulation_date: date,
-    seed: int = 42,
-) -> list[EnergyInput]:
-    """Génère 24 points horaires de données énergétiques synthétiques.
+def _hourly_solar_profile(hour: int) -> float:
+    if hour < 6 or hour > 19:
+        return 0.0
+    peak = 4.2
+    x = (hour - 6) / 13 * math.pi
+    return max(0.0, peak * math.sin(x))
 
-    La charge de base suit un profil résidentiel typique avec des pics
-    le matin (7h-9h) et le soir (18h-22h). La production solaire suit
-    une courbe en cloche centrée sur midi. La charge flexible représente
-    ~20-35 % de la charge totale.
-    """
+
+def _hourly_base_load_profile(hour: int) -> float:
+    night = 0.8
+    morning_peak = 1.6 if 7 <= hour <= 9 else 0.0
+    evening_peak = 2.1 if 18 <= hour <= 22 else 0.0
+    workday = 1.0 if 10 <= hour <= 17 else 0.0
+    return night + morning_peak + evening_peak + workday
+
+
+def _hourly_flexible_load_profile(hour: int) -> float:
+    if 6 <= hour <= 8:
+        return 0.5
+    if 12 <= hour <= 14:
+        return 0.6
+    if 19 <= hour <= 22:
+        return 0.8
+    return 0.2
+
+
+def generate_synthetic_day(simulation_date: date, seed: int = 42) -> list[EnergyInput]:
     rng = random.Random(seed)
-    start = datetime(simulation_date.year, simulation_date.month, simulation_date.day)
+    start = datetime.combine(simulation_date, time(0, 0))
     points: list[EnergyInput] = []
 
-    for h in range(24):
-        ts = start + timedelta(hours=h)
+    for index in range(24):
+        timestamp = start + timedelta(hours=index)
+        hour = timestamp.hour
 
-        # Profil de charge de base : creux la nuit, pics matin/soir
-        morning_peak = math.exp(-0.5 * ((h - 8) / 1.5) ** 2)
-        evening_peak = math.exp(-0.5 * ((h - 20) / 2.0) ** 2)
-        night_base = 0.3
-        base = night_base + 1.2 * morning_peak + 1.8 * evening_peak
-        base *= 1.0 + rng.uniform(-0.05, 0.05)  # bruit ±5 %
-
-        # Charge flexible : actif principalement en journée
-        daytime = math.exp(-0.5 * ((h - 14) / 4.0) ** 2)
-        flex = 0.4 * daytime * (1.0 + rng.uniform(-0.1, 0.1))
-
-        # Production solaire : cloche centrée sur 13h
-        if 6 <= h <= 20:
-            solar_raw = math.exp(-0.5 * ((h - 13) / 3.5) ** 2)
-            solar = 3.5 * solar_raw * (1.0 + rng.uniform(-0.08, 0.08))
-        else:
-            solar = 0.0
+        base = _hourly_base_load_profile(hour) * rng.uniform(0.9, 1.1)
+        flexible = _hourly_flexible_load_profile(hour) * rng.uniform(0.8, 1.2)
+        solar = _hourly_solar_profile(hour) * rng.uniform(0.82, 1.18)
 
         points.append(
             EnergyInput(
-                timestamp=ts,
-                base_load_kwh=round(max(base, 0.05), 4),
-                flexible_load_kwh=round(max(flex, 0.0), 4),
-                solar_kwh=round(max(solar, 0.0), 4),
+                timestamp=timestamp,
+                base_load_kwh=round(base, 3),
+                flexible_load_kwh=round(flexible, 3),
+                solar_kwh=round(max(0.0, solar), 3),
             )
         )
 

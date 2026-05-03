@@ -4,59 +4,65 @@ from .models import EnergyInput
 
 
 def optimize_flexible_schedule(
-    inputs: list[EnergyInput],
+    points: list[EnergyInput],
     max_relative_shift: float = 0.45,
 ) -> list[EnergyInput]:
-    """Optimise la charge flexible pour maximiser l'autoconsommation solaire.
-
-    Stratégie :
-    - Pour chaque heure avec excédent solaire, on tire de la charge flexible
-      depuis les heures où il n'y a pas de solaire.
-    - Le paramètre ``max_relative_shift`` limite la part de charge flexible
-      déplaçable (entre 0 et 1).
-    """
-    if not inputs:
+    if not points:
         return []
 
-    # Copie mutable des charges flexibles
-    flex = [inp.flexible_load_kwh for inp in inputs]
-    solar = [inp.solar_kwh for inp in inputs]
-    base = [inp.base_load_kwh for inp in inputs]
+    base_loads = [point.base_load_kwh for point in points]
+    flexible_loads = [point.flexible_load_kwh for point in points]
+    solar = [point.solar_kwh for point in points]
 
-    # Calcul des excédents / déficits solaires par rapport à la charge de base
-    net_solar = [solar[h] - base[h] - flex[h] for h in range(len(inputs))]
+    lower_bounds = [max(0.0, value * (1 - max_relative_shift)) for value in flexible_loads]
+    upper_bounds = [value * (1 + max_relative_shift) for value in flexible_loads]
 
-    # Identifier les heures avec excédent solaire (receveurs) et sans (donneurs)
-    surplus_hours = [h for h, net in enumerate(net_solar) if net > 0]
-    deficit_hours = sorted(
-        [h for h, net in enumerate(net_solar) if net <= 0],
-        key=lambda h: net_solar[h],  # les plus déficitaires d'abord
+    total_flexible = sum(flexible_loads)
+    optimized = lower_bounds[:]
+    remaining = total_flexible - sum(optimized)
+
+    priorities = sorted(
+        range(len(points)),
+        key=lambda index: (solar[index] - base_loads[index], solar[index]),
+        reverse=True,
     )
 
-    for src in deficit_hours:
-        if not surplus_hours:
+    for index in priorities:
+        if remaining <= 1e-9:
             break
-        max_move = flex[src] * max_relative_shift
-        moved = 0.0
-        for dst in surplus_hours:
-            available = min(max_move - moved, net_solar[dst])
+        available = upper_bounds[index] - optimized[index]
+        if available <= 0:
+            continue
+        add_energy = min(available, remaining)
+        optimized[index] += add_energy
+        remaining -= add_energy
+
+    if remaining > 1e-9:
+        for index in range(len(points)):
+            if remaining <= 1e-9:
+                break
+            available = upper_bounds[index] - optimized[index]
             if available <= 0:
                 continue
-            transfer = min(available, flex[src] - moved)
-            flex[src] -= transfer
-            flex[dst] += transfer
-            net_solar[dst] -= transfer
-            net_solar[src] += transfer
-            moved += transfer
-            if moved >= max_move:
-                break
+            add_energy = min(available, remaining)
+            optimized[index] += add_energy
+            remaining -= add_energy
 
-    return [
-        EnergyInput(
-            timestamp=inp.timestamp,
-            base_load_kwh=inp.base_load_kwh,
-            flexible_load_kwh=round(max(flex[h], 0.0), 6),
-            solar_kwh=inp.solar_kwh,
+    if remaining > 1e-9:
+        total = sum(optimized)
+        if total > 0:
+            factor = total_flexible / total
+            optimized = [value * factor for value in optimized]
+
+    result: list[EnergyInput] = []
+    for point, new_flexible in zip(points, optimized):
+        result.append(
+            EnergyInput(
+                timestamp=point.timestamp,
+                base_load_kwh=point.base_load_kwh,
+                flexible_load_kwh=round(new_flexible, 3),
+                solar_kwh=point.solar_kwh,
+            )
         )
-        for h, inp in enumerate(inputs)
-    ]
+
+    return result

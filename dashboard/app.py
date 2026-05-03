@@ -218,7 +218,7 @@ elif menu == "📊 Indicateurs KPI":
         "autonomy_rate":          ("Taux d'autonomie",    "%"),
         "peak_grid_import_kwh":   ("Pic import réseau",   "kWh"),
         "load_factor":            ("Facteur de charge",   ""),
-        "battery_cycles":         ("Cycles batterie éq.", ""),
+        "equivalent_battery_cycles": ("Cycles batterie éq.", ""),
         "net_energy_cost_eur":    ("Coût net énergétique","€"),
         "grid_co2_kg":            ("Émissions CO₂ réseau","kg"),
     }

@@ -1,52 +1,56 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 
 
-@dataclass
+@dataclass(slots=True)
 class BatteryConfig:
-    """Configuration de la batterie de stockage."""
-    capacity_kwh: float = 10.0        # Capacité totale
-    initial_soc: float = 0.5          # State-of-Charge initial (0-1)
-    max_charge_rate_kw: float = 3.0   # Puissance max de charge
-    max_discharge_rate_kw: float = 3.0
-    charge_efficiency: float = 0.95
-    discharge_efficiency: float = 0.95
+    capacity_kwh: float = 20.0
+    max_charge_kw: float = 6.0
+    max_discharge_kw: float = 6.0
+    initial_soc_kwh: float = 8.0
+    round_trip_efficiency: float = 0.92
 
 
-@dataclass
+@dataclass(slots=True)
 class EnergyInput:
-    """Données d'entrée par pas horaire."""
     timestamp: datetime
-    base_load_kwh: float       # Charge de base non déplaçable
-    flexible_load_kwh: float   # Charge flexible (décalable)
-    solar_kwh: float           # Production solaire
-
-
-@dataclass
-class EnergyFlow:
-    """Flux énergétiques calculés pour un pas horaire."""
-    timestamp: datetime
-    total_load_kwh: float
+    base_load_kwh: float
+    flexible_load_kwh: float
     solar_kwh: float
-    battery_charge_kwh: float    # positif = charge, négatif = décharge
-    grid_import_kwh: float       # énergie importée du réseau
-    grid_export_kwh: float       # énergie exportée vers le réseau
-    soc: float                   # State-of-Charge batterie (0-1)
+
+    @property
+    def total_load_kwh(self) -> float:
+        return self.base_load_kwh + self.flexible_load_kwh
 
 
-@dataclass
-class EnergyKPIs:
-    """Indicateurs de performance énergétique agrégés sur la journée."""
+@dataclass(slots=True)
+class EnergyFlow:
+    timestamp: datetime
+    load_kwh: float
+    solar_kwh: float
+    solar_used_for_load_kwh: float
+    battery_charge_kwh: float
+    battery_discharge_kwh: float
+    battery_soc_kwh: float
+    grid_import_kwh: float
+    grid_export_kwh: float
+
+
+@dataclass(slots=True)
+class KPIResult:
     total_consumption_kwh: float
     total_solar_kwh: float
     grid_import_kwh: float
     grid_export_kwh: float
-    self_consumption_rate: float   # part du solaire autoconsommée
-    autonomy_rate: float           # part de la conso couverte hors réseau
-    peak_grid_import_kwh: float    # pic horaire d'import réseau
-    load_factor: float             # facteur de charge (moy / pic)
-    battery_cycles: float          # cycles équivalents batterie
+    self_consumption_rate: float
+    autonomy_rate: float
+    peak_grid_import_kwh: float
+    load_factor: float
+    equivalent_battery_cycles: float
     net_energy_cost_eur: float
     grid_co2_kg: float
+
+    def to_dict(self) -> dict:
+        return asdict(self)
