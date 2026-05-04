@@ -13,6 +13,8 @@ dependencies = [
     "streamlit",
     "pandas",
     "pydantic",
+    "prometheus-client",
+    "psutil",
 ]
 
 [project.optional-dependencies]

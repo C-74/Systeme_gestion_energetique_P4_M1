@@ -1,4 +1,21 @@
 services:
+  backend-api:
+    build: .
+    container_name: backend-api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 3000
+    ports:
+      - "3000:3000"
+
+  frontend-dashboard:
+    build: .
+    container_name: frontend-dashboard
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+    ports:
+      - "8501:8501"
+      - "8001:8001"
+    depends_on:
+      - backend-api
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -6,6 +23,9 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
+    depends_on:
+      - backend-api
+      - frontend-dashboard
 
   grafana:
     image: grafana/grafana:latest

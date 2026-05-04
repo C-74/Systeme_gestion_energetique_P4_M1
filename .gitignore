@@ -1,4 +1,6 @@
 .venv
+.review-venv
+.review-pyproject-venv
 .python-version
 .pytest_cache
 __pycache__/

@@ -67,6 +67,8 @@ def run_scenarios(
     if include_inputs:
         result["baseline_inputs"] = baseline_inputs
         result["optimized_inputs"] = optimized_inputs
+        result["baseline_flows"] = baseline_flows
+        result["optimized_flows"] = optimized_flows
         result["kpis"] = {"baseline": asdict(baseline_kpis), "optimized": asdict(optimized_kpis)}
 
     return result
