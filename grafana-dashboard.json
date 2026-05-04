@@ -1,39 +1,73 @@
 {
-  "title": "SRE Golden Signals - FastAPI",
+  "title": "SRE Golden Signals - Energy Platform",
   "timezone": "browser",
   "refresh": "5s",
   "panels": [
     {
       "type": "timeseries",
-      "title": "Trafic (Interactions / sec)",
+      "title": "Frontend - Trafic (interactions / sec)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(streamlit_interactions_total[5m]))", "legendFormat": "Interactions utilisateurs" }
+        { "expr": "sum(rate(streamlit_interactions_total{job=\"frontend_dashboard\"}[5m]))", "legendFormat": "Interactions utilisateurs" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Taux d'Erreurs (Crash script)",
+      "title": "Frontend - Taux d'erreurs",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
-        { "expr": "sum(rate(streamlit_errors_total[5m]))", "legendFormat": "Erreurs script" }
+        { "expr": "sum(rate(streamlit_errors_total{job=\"frontend_dashboard\"}[5m]))", "legendFormat": "Erreurs dashboard" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Latence p95 (secondes)",
+      "title": "Frontend - Latence p95 (secondes)",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(streamlit_run_duration_seconds_bucket[5m])) by (le))", "legendFormat": "Temps de chargement p95" }
+        { "expr": "histogram_quantile(0.95, sum(rate(streamlit_run_duration_seconds_bucket{job=\"frontend_dashboard\"}[5m])) by (le))", "legendFormat": "Temps de chargement p95" }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Saturation CPU & RAM (%)",
+      "title": "Frontend - Saturation CPU / RAM (%)",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
-        { "expr": "process_cpu_usage_percent", "legendFormat": "CPU %" },
-        { "expr": "process_memory_usage_percent", "legendFormat": "RAM %" }
+        { "expr": "process_cpu_usage_percent{job=\"frontend_dashboard\"}", "legendFormat": "CPU %" },
+        { "expr": "process_memory_usage_percent{job=\"frontend_dashboard\"}", "legendFormat": "RAM %" }
+      ],
+      "fieldConfig": { "defaults": { "max": 100, "min": 0 } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Backend - Requêtes / sec",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{job=\"backend_api\"}[5m]))", "legendFormat": "Requêtes API" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Backend - Erreurs 5xx / sec",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{job=\"backend_api\",status_code=~\"5..\"}[5m]))", "legendFormat": "Erreurs serveur" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Backend - Latence p95 (secondes)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"backend_api\"}[5m])) by (le))", "legendFormat": "Latence API p95" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Backend - Saturation CPU / RAM (%)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        { "expr": "process_cpu_usage_percent{job=\"backend_api\"}", "legendFormat": "CPU %" },
+        { "expr": "process_memory_usage_percent{job=\"backend_api\"}", "legendFormat": "RAM %" }
       ],
       "fieldConfig": { "defaults": { "max": 100, "min": 0 } }
     }

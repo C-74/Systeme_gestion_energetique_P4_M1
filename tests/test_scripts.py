@@ -51,8 +51,11 @@ def test_run_scenarios_include_inputs() -> None:
     )
 
     assert "baseline_inputs" in result and "optimized_inputs" in result
+    assert "baseline_flows" in result and "optimized_flows" in result
     assert len(result["baseline_inputs"]) == 24
     assert len(result["optimized_inputs"]) == 24
+    assert len(result["baseline_flows"]) == 24
+    assert len(result["optimized_flows"]) == 24
 
 
 def test_simulate_days_script_outputs(tmp_path: Path) -> None:
