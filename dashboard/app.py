@@ -1,22 +1,26 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import time
-import psutil
-from dataclasses import asdict
 from datetime import date
 
 import pandas as pd
+import psutil
 import streamlit as st
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
-import sys
-import os
-# Ajout du dossier 'src' au chemin de Python pour qu'il trouve le module
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+# Ajout du dossier racine et de 'src' au chemin de Python.
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+SRC_ROOT = os.path.join(REPO_ROOT, "src")
+for path in (REPO_ROOT, SRC_ROOT):
+    if path not in sys.path:
+        sys.path.append(path)
 
 from energy_management.cli import run_scenarios
 from energy_management.data_sources import load_inputs_from_csv
+from sensors.virtual_sensors import VirtualSensor
 
 # ── Configuration de la page ──────────────────────────────────────────────────
 st.set_page_config(
@@ -95,13 +99,15 @@ menu = st.sidebar.radio(
 def compute(sim_date: date, seed: int, max_shift: float, csv_bytes: bytes | None):
     custom_inputs = None
     if csv_bytes:
-        import io
-        import tempfile, os
+        import tempfile
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
             tmp.write(csv_bytes)
             tmp_path = tmp.name
-        custom_inputs = load_inputs_from_csv(tmp_path)
-        os.unlink(tmp_path)
+        try:
+            custom_inputs = load_inputs_from_csv(tmp_path)
+        finally:
+            os.unlink(tmp_path)
 
     result = run_scenarios(
         simulation_date=sim_date,
@@ -113,17 +119,34 @@ def compute(sim_date: date, seed: int, max_shift: float, csv_bytes: bytes | None
     return result
 
 
-csv_bytes = uploaded.read() if uploaded else None
+csv_bytes = uploaded.getvalue() if uploaded else None
 
 # Lancer automatiquement au chargement, ou sur clic bouton
 if "result" not in st.session_state or run_btn:
-    st.session_state["result"] = compute(sim_date, seed, max_shift, csv_bytes)
+    try:
+        st.session_state["result"] = compute(sim_date, seed, max_shift, csv_bytes)
+        st.session_state.pop("result_error", None)
+    except ValueError as exc:
+        metrics["APP_ERRORS"].inc()
+        st.session_state["result_error"] = f"Import CSV invalide : {exc}"
+    except Exception as exc:  # pylint: disable=broad-except
+        metrics["APP_ERRORS"].inc()
+        st.session_state["result_error"] = f"Erreur lors du chargement des données : {exc}"
+
+if st.session_state.get("result_error"):
+    st.error(st.session_state["result_error"])
+
+if "result" not in st.session_state:
+    st.info("Corrigez le fichier CSV importé ou retirez-le pour relancer une simulation.")
+    st.stop()
 
 result = st.session_state["result"]
 
 # ── Préparer les DataFrames ───────────────────────────────────────────────────
 baseline_inputs = result["baseline_inputs"]
 optimized_inputs = result["optimized_inputs"]
+baseline_flows = result["baseline_flows"]
+optimized_flows = result["optimized_flows"]
 kpis_b = result["kpis"]["baseline"]
 kpis_o = result["kpis"]["optimized"]
 
@@ -139,8 +162,53 @@ def inputs_to_df(inputs) -> pd.DataFrame:
         for inp in inputs
     ]).set_index("Heure")
 
+
+def flows_to_df(flows) -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "Heure": flow.timestamp.strftime("%H:%M"),
+            "SOC batterie (kWh)": flow.battery_soc_kwh,
+            "Charge batterie (kWh)": flow.battery_charge_kwh,
+            "Décharge batterie (kWh)": flow.battery_discharge_kwh,
+            "Import réseau (kWh)": flow.grid_import_kwh,
+            "Export réseau (kWh)": flow.grid_export_kwh,
+        }
+        for flow in flows
+    ]).set_index("Heure")
+
+
+def build_virtual_sensors_df() -> pd.DataFrame:
+    current_load = float(df_base["Charge totale (kWh)"].iloc[-1])
+    current_solar = float(df_base["Solaire (kWh)"].iloc[-1])
+    current_storage = float(df_flow_base["SOC batterie (kWh)"].iloc[-1])
+
+    sensor_specs = [
+        ("Compteur principal", "consommation", current_load),
+        ("Champ photovoltaïque", "solaire", current_solar),
+        ("Batterie bâtiment", "stockage", current_storage),
+    ]
+
+    rows = []
+    for name, sensor_type, current_value in sensor_specs:
+        sensor = VirtualSensor(name=name, sensor_type=sensor_type)
+        info = sensor.get_info()
+        rows.append(
+            {
+                "Capteur": info["name"],
+                "Type": info["type"],
+                "Statut": info["status"],
+                "Valeur courante": f"{current_value:.3f} kWh",
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
 df_base = inputs_to_df(baseline_inputs)
-df_opt  = inputs_to_df(optimized_inputs)
+df_opt = inputs_to_df(optimized_inputs)
+df_flow_base = flows_to_df(baseline_flows)
+df_flow_opt = flows_to_df(optimized_flows)
+df_sensors = build_virtual_sensors_df()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE : Vue d'ensemble
@@ -208,12 +276,18 @@ elif menu == "📡 Capteurs (Virtuels)":
     st.markdown("Données horaires générées synthétiquement pour la journée simulée.")
     st.divider()
 
-    tab1, tab2, tab3 = st.tabs(["⚡ Consommation", "☀️ Production Solaire", "🔋 Charge Flexible"])
+    st.subheader("🧭 Inventaire des capteurs")
+    st.dataframe(df_sensors, use_container_width=True, hide_index=True)
+
+    st.divider()
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["⚡ Consommation", "☀️ Production Solaire", "🔋 Stockage batterie", "↔️ Charge flexible"]
+    )
 
     with tab1:
-        st.subheader("Charge de base (non déplaçable)")
-        st.line_chart(df_base[["Charge base (kWh)"]], height=300, color=["#f97316"])
-        st.caption("Consommation incompressible : éclairage, froid, appareils toujours actifs.")
+        st.subheader("Charge de base et charge totale")
+        st.line_chart(df_base[["Charge base (kWh)", "Charge totale (kWh)"]], height=300)
+        st.caption("Visualisation des usages de consommation portés par le capteur principal.")
 
     with tab2:
         st.subheader("Production solaire photovoltaïque")
@@ -221,6 +295,20 @@ elif menu == "📡 Capteurs (Virtuels)":
         st.caption("Courbe en cloche centrée sur 13h — simulée avec bruit ±8%.")
 
     with tab3:
+        st.subheader("État de charge de la batterie")
+        df_storage = pd.DataFrame(
+            {
+                "SOC baseline (kWh)": df_flow_base["SOC batterie (kWh)"],
+                "SOC optimisé (kWh)": df_flow_opt["SOC batterie (kWh)"],
+            }
+        )
+        st.line_chart(df_storage, height=300)
+        st.caption("Le stockage représente le niveau de batterie disponible heure par heure.")
+
+        st.subheader("Charge / décharge batterie (baseline)")
+        st.line_chart(df_flow_base[["Charge batterie (kWh)", "Décharge batterie (kWh)"]], height=250)
+
+    with tab4:
         st.subheader("Charge flexible — Baseline vs Optimisé")
         df_flex = pd.DataFrame({
             "Baseline": df_base["Charge flexible (kWh)"],
@@ -231,7 +319,7 @@ elif menu == "📡 Capteurs (Virtuels)":
 
     st.divider()
     st.subheader("📄 Données brutes (baseline)")
-    st.dataframe(df_base, use_container_width=True)
+    st.dataframe(pd.concat([df_base, df_flow_base], axis=1), use_container_width=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE : Indicateurs KPI
@@ -352,4 +440,3 @@ elif menu == "⚙️ Optimisation":
 # ── Fin du script : Enregistrement de la latence ──────────────────────────────
 process_time = time.time() - start_time
 metrics["APP_DURATION"].observe(process_time)
-

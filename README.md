@@ -37,6 +37,13 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
+Cette installation inclut les dépendances nécessaires pour :
+
+- la CLI métier ;
+- l'API FastAPI ;
+- le dashboard Streamlit ;
+- l'export de métriques Prometheus.
+
 ## Exécution
 
 Simulation baseline + optimisation, puis affichage des KPI :
@@ -68,6 +75,37 @@ Calculer les KPI à partir d'un CSV existant :
 ```bash
 python scripts/kpi_from_csv.py data/mesures.csv --json
 ```
+
+## Lancement applicatif
+
+API FastAPI :
+
+```bash
+uvicorn api.main:app --host 0.0.0.0 --port 3000
+```
+
+Dashboard Streamlit :
+
+```bash
+streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+```
+
+## Déploiement local avec Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Services exposés :
+
+- API : `http://localhost:3000`
+- Dashboard : `http://localhost:8501`
+- Prometheus : `http://localhost:9090`
+- Grafana : `http://localhost:8080`
+
+Documentation SRE :
+
+- Voir `document_sre_projet_4.md` pour les SLI, SLO, SLA et error budgets.
 
 ## KPI calculés
 
