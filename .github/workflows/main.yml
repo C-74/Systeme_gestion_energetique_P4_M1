@@ -109,17 +109,21 @@ jobs:
               scrape_interval: 15s
               evaluation_interval: 15s
             scrape_configs:
-              - job_name: 'frontend_golden_signals'
+              - job_name: 'backend_api'
+                metrics_path: '/metrics'
+                static_configs:
+                  - targets: ['backend-api:3000']
+              - job_name: 'frontend_dashboard'
                 metrics_path: '/'
                 static_configs:
                   - targets: ['frontend-dashboard:8001']
             EOF
             
-            # Lancement de Prometheus
-            docker run -d --name prometheus --network tp_network -p 9090:9090 -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus:latest
+            # Lancement de Prometheus (AJOUT DE LA PERSISTANCE ICI)
+            docker run -d --name prometheus --network tp_network -p 9090:9090 -v $(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml -v prometheus_data:/prometheus prom/prometheus:latest
 
-            # Lancement de Grafana (sur le port 8000)
-            docker run -d --name grafana --network tp_network -p 8000:3000 -e GF_SECURITY_ADMIN_PASSWORD=admin grafana/grafana:latest
+            # Lancement de Grafana (AJOUT DE LA PERSISTANCE ICI)
+            docker run -d --name grafana --network tp_network -p 8000:3000 -e GF_SECURITY_ADMIN_PASSWORD=admin -v grafana_data:/var/lib/grafana grafana/grafana:latest
             
             # Lancement du Frontend (Dashboard Streamlit)
             docker run -d --name frontend-dashboard --network tp_network -p 80:80 $REPO_URL/$ACTOR/$IMAGE_NAME:latest streamlit run dashboard/app.py --server.port 80 --server.address 0.0.0.0
