@@ -1,0 +1,272 @@
+{
+  "title": "SRE SLO Dashboard - Energy Platform",
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "SLO-1 - Disponibilite API (%)",
+      "description": "Objectif : disponibilite API >= 99,5% sur 30 jours glissants.",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "avg_over_time(up{job=\"backend_api\"}[30d]) * 100",
+          "legendFormat": "Disponibilite API"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 99 },
+              { "color": "green", "value": 99.5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO-2 - Taux de succes API (%)",
+      "description": "Objectif : taux de succes API >= 99,0% sur 30 jours glissants.",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "100 * (1 - (((sum(increase(http_requests_total{job=\"backend_api\",status_code=~\"5..\",endpoint!=\"/metrics\"}[30d])) or vector(0)) / clamp_min((sum(increase(http_requests_total{job=\"backend_api\",endpoint!=\"/metrics\"}[30d])) or vector(0)), 1))))",
+          "legendFormat": "Succes API"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 98 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO-3 - Conformite latence API (%)",
+      "description": "Objectif : latence p95 API < 500 ms sur au moins 95% des fenetres de 5 minutes sur 30 jours.",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "100 * (sum_over_time((((histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"backend_api\",endpoint!=\"/metrics\"}[5m]))) < bool 0.5) * (sum(rate(http_request_duration_seconds_count{job=\"backend_api\",endpoint!=\"/metrics\"}[5m])) > bool 0))[30d:5m])) / clamp_min(sum_over_time(((sum(rate(http_request_duration_seconds_count{job=\"backend_api\",endpoint!=\"/metrics\"}[5m])) > bool 0)[30d:5m])), 1))",
+          "legendFormat": "Conformite latence API"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO-4 - Disponibilite dashboard (%)",
+      "description": "Objectif : disponibilite dashboard >= 99,0% sur 30 jours glissants.",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "expr": "avg_over_time(up{job=\"frontend_dashboard\"}[30d]) * 100",
+          "legendFormat": "Disponibilite dashboard"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 98.5 },
+              { "color": "green", "value": 99 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO-5 - Conformite latence dashboard (%)",
+      "description": "Objectif : latence p95 dashboard < 2 s sur au moins 95% des fenetres de 5 minutes sur 30 jours.",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 6 },
+      "targets": [
+        {
+          "expr": "100 * (sum_over_time((((histogram_quantile(0.95, sum by (le) (rate(streamlit_run_duration_seconds_bucket{job=\"frontend_dashboard\"}[5m]))) < bool 2) * (sum(rate(streamlit_run_duration_seconds_count{job=\"frontend_dashboard\"}[5m])) > bool 0))[30d:5m])) / clamp_min(sum_over_time(((sum(rate(streamlit_run_duration_seconds_count{job=\"frontend_dashboard\"}[5m])) > bool 0)[30d:5m])), 1))",
+          "legendFormat": "Conformite latence dashboard"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 90 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SLO-6 - Taux de succes dashboard (%)",
+      "description": "Objectif : taux d'interactions sans erreur >= 98,0% sur 30 jours glissants.",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 6 },
+      "targets": [
+        {
+          "expr": "100 * (1 - (((increase(streamlit_errors_total{job=\"frontend_dashboard\"}[30d]) or vector(0)) / clamp_min((increase(streamlit_interactions_total{job=\"frontend_dashboard\"}[30d]) or vector(0)), 1))))",
+          "legendFormat": "Succes dashboard"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 98 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence API p95 (secondes)",
+      "description": "Courbe de contexte pour le SLO-3. Seuil cible : 0,5 s.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"backend_api\",endpoint!=\"/metrics\"}[5m])))",
+          "legendFormat": "API p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Latence dashboard p95 (secondes)",
+      "description": "Courbe de contexte pour le SLO-5. Seuil cible : 2 s.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(streamlit_run_duration_seconds_bucket{job=\"frontend_dashboard\"}[5m])))",
+          "legendFormat": "Dashboard p95"
+        }
+      ]
+    }
+  ]
+}
