@@ -31,10 +31,7 @@ jobs:
 
       - name: install dependencies & test
         run: |
-          pip install -r requirements.txt
-          pip install pytest
-          # Ajout du dossier src au PYTHONPATH pour les tests
-          export PYTHONPATH="$PYTHONPATH:$(pwd)/src"
+          pip install -e .[dev]
           pytest -q
 
   build:
