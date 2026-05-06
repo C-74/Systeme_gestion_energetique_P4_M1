@@ -107,6 +107,12 @@ Documentation SRE :
 
 - Voir `document_sre_projet_4.md` pour les SLI, SLO, SLA et error budgets.
 
+## Déploiement AWS
+
+Dashboard streamlit : http://16.170.40.61/
+
+Grafana : http://16.170.40.61:8000/
+
 ## KPI calculés
 
 - Consommation totale
